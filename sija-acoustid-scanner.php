@@ -14,9 +14,8 @@
 
 header('Content-Type: application/json; charset=utf-8');
 
-$SHARED_SECRET = 'CHANGE_THIS_TO_A_LONG_RANDOM_SECRET';
-$ACOUSTID_API_KEY = 'PASTE_YOUR_ACOUSTID_API_KEY_HERE';
-
+$SHARED_SECRET = 'SIJA2026SECRET';
+$ACOUSTID_API_KEY = 'J0i6VBUCKX';
 function sija_json($data) {
     echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
