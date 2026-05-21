@@ -91,9 +91,21 @@ $params = [
     'fingerprint' => $fp['fingerprint'],
 ];
 
-$lookup_url = 'https://api.acoustid.org/v2/lookup?' . http_build_query($params);
+$lookup_url = 'https://api.acoustid.org/v2/lookup';
 
-$response = @file_get_contents($lookup_url);
+$post_data = http_build_query($params);
+
+$acoustid_context = stream_context_create([
+    'http' => [
+        'method' => 'POST',
+        'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+        'content' => $post_data,
+        'timeout' => 120,
+        'user_agent' => 'SIJA Music Scanner v1.3'
+    ]
+]);
+
+$response = @file_get_contents($lookup_url, false, $acoustid_context);
 
 if ($response === false) {
 
