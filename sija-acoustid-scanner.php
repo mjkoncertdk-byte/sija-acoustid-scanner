@@ -1,23 +1,16 @@
 <?php
 /**
- * SIJA Music AcoustID Live Scanner v1.1
- *
- * Requirements on external server/VPS:
- * - PHP with shell_exec enabled
- * - fpcalc / Chromaprint installed
- * - Server must be able to download audio URLs from SIJA-music.com
- *
- * Ubuntu install:
- * sudo apt update
- * sudo apt install libchromaprint-tools ffmpeg
+ * SIJA Music AcoustID Live Scanner v1.2
+ * Improved debug/error handling
  */
 
 header('Content-Type: application/json; charset=utf-8');
 
 $SHARED_SECRET = 'SIJA2026SECRET';
 $ACOUSTID_API_KEY = 'QZ4afeFe89';
+
 function sija_json($data) {
-    echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     exit;
 }
 
@@ -40,51 +33,53 @@ if (($data['token'] ?? '') !== $SHARED_SECRET) {
 }
 
 $audio_url = $data['audio_url'] ?? '';
+
 if (!$audio_url || !filter_var($audio_url, FILTER_VALIDATE_URL)) {
     sija_fail('Missing or invalid audio_url');
 }
 
 $tmp_dir = sys_get_temp_dir() . '/sija_acoustid_scanner';
+
 if (!is_dir($tmp_dir)) {
     mkdir($tmp_dir, 0700, true);
 }
 
 $path = parse_url($audio_url, PHP_URL_PATH);
 $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-if (!in_array($ext, ['mp3', 'wav', 'flac'], true)) {
-    $ext = 'audio';
+
+if (!$ext) {
+    $ext = 'mp3';
 }
 
 $tmp_file = $tmp_dir . '/' . uniqid('sija_', true) . '.' . $ext;
 
 $context = stream_context_create([
     'http' => [
-        'timeout' => 90,
-        'user_agent' => 'SIJA Music AcoustID Scanner/1.1'
+        'timeout' => 120,
+        'user_agent' => 'SIJA Music Scanner v1.2'
     ]
 ]);
 
 $audio_data = @file_get_contents($audio_url, false, $context);
-if (!$audio_data) {
-    sija_fail('Could not download audio file from WordPress');
-}
 
-if (strlen($audio_data) < 10000) {
-    @unlink($tmp_file);
-    sija_fail('Downloaded audio file is too small or invalid');
+if (!$audio_data) {
+    sija_fail('Could not download audio file', [
+        'audio_url' => $audio_url
+    ]);
 }
 
 file_put_contents($tmp_file, $audio_data);
 
-$fpcalc_cmd = 'fpcalc -json ' . escapeshellarg($tmp_file) . ' 2>&1';
-$fpcalc_output = shell_exec($fpcalc_cmd);
-
-@unlink($tmp_file);
+$cmd = 'fpcalc -json ' . escapeshellarg($tmp_file) . ' 2>&1';
+$fpcalc_output = shell_exec($cmd);
 
 $fp = json_decode($fpcalc_output, true);
 
-if (!is_array($fp) || empty($fp['fingerprint']) || empty($fp['duration'])) {
-    sija_fail('fpcalc failed or returned invalid fingerprint', [
+if (!is_array($fp) || empty($fp['fingerprint'])) {
+
+    @unlink($tmp_file);
+
+    sija_fail('fpcalc failed', [
         'fpcalc_output' => $fpcalc_output
     ]);
 }
@@ -97,52 +92,74 @@ $params = [
 ];
 
 $lookup_url = 'https://api.acoustid.org/v2/lookup?' . http_build_query($params);
+
 $response = @file_get_contents($lookup_url);
 
-if (!$response) {
-    sija_fail('No response from AcoustID');
+if ($response === false) {
+
+    $error = error_get_last();
+
+    sija_fail('AcoustID HTTP request failed', [
+        'lookup_url' => $lookup_url,
+        'php_error' => $error
+    ]);
 }
 
 $result = json_decode($response, true);
 
 if (!is_array($result)) {
-    sija_fail('Invalid AcoustID response', [
+
+    sija_fail('Invalid AcoustID JSON response', [
         'raw_response' => $response
+    ]);
+}
+
+if (($result['status'] ?? '') !== 'ok') {
+
+    sija_fail('AcoustID returned error', [
+        'response' => $result
     ]);
 }
 
 $best_match = 'No match found';
 $best_score = 0;
-$best_title = '';
 $best_artist = '';
+$best_title = '';
 $best_acoustid = '';
 
 if (!empty($result['results'][0])) {
+
     $best = $result['results'][0];
-    $best_score = isset($best['score']) ? floatval($best['score']) : 0;
+
+    $best_score = isset($best['score'])
+        ? floatval($best['score'])
+        : 0;
+
     $best_acoustid = $best['id'] ?? '';
 
     if (!empty($best['recordings'][0])) {
+
         $rec = $best['recordings'][0];
-        $best_title = $rec['title'] ?? 'Unknown title';
-        $best_artist = 'Unknown artist';
+
+        $best_title = $rec['title'] ?? '';
 
         if (!empty($rec['artists'][0]['name'])) {
             $best_artist = $rec['artists'][0]['name'];
         }
 
-        $best_match = $best_artist . ' - ' . $best_title;
-    } else {
-        $best_match = 'AcoustID match found, but no recording metadata returned';
+        $best_match = trim($best_artist . ' - ' . $best_title, ' -');
     }
 }
 
 $risk = 'Green';
+
 if ($best_score >= 0.80) {
     $risk = 'Red';
 } elseif ($best_score >= 0.55) {
     $risk = 'Yellow';
 }
+
+@unlink($tmp_file);
 
 sija_json([
     'status' => 'Completed',
@@ -153,8 +170,5 @@ sija_json([
     'score' => $best_score,
     'acoustid' => $best_acoustid,
     'duration' => (int) round($fp['duration']),
-    'message' => $risk === 'Green'
-        ? 'No strong match found.'
-        : 'Possible existing recording match found. Manual review recommended.',
     'raw' => $result
 ]);
