@@ -152,23 +152,23 @@ if (!empty($result['results'][0])) {
 
     if (!empty($best['recordings'][0])) {
 
-    $rec = $best['recordings'][0];
+        $rec = $best['recordings'][0];
 
-    $best_title = $rec['title'] ?? 'Unknown title';
+        $best_title = $rec['title'] ?? 'Unknown title';
 
-    if (!empty($rec['artists'][0]['name'])) {
-        $best_artist = $rec['artists'][0]['name'];
+        if (!empty($rec['artists'][0]['name'])) {
+            $best_artist = $rec['artists'][0]['name'];
+        } else {
+            $best_artist = 'Unknown artist';
+        }
+
+        $best_match = trim($best_artist . ' - ' . $best_title);
+
     } else {
-        $best_artist = 'Unknown artist';
+
+        $best_match = 'Fingerprint match found (metadata unavailable)';
     }
-
-    $best_match = trim($best_artist . ' - ' . $best_title);
-
-} else {
-
-    $best_match = 'Fingerprint match found (metadata unavailable)';
 }
-    'raw' => $result
 
 $risk = 'Green';
 
