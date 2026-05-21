@@ -101,7 +101,8 @@ $acoustid_context = stream_context_create([
         'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
         'content' => $post_data,
         'timeout' => 120,
-        'user_agent' => 'SIJA Music Scanner v1.3'
+        'user_agent' => 'SIJA Music Scanner v1.3',
+        'ignore_errors' => true
     ]
 ]);
 
