@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: text/plain');
-
+echo "API key prefix: " . substr('W1ojLlGldj', 0, 4) . "\n";
+echo "API key length: " . strlen('W1ojLlGldj') . "\n\n";
 $url = 'https://api.acoustid.org/v2/lookup';
 
 $post_data = http_build_query([
