@@ -9,12 +9,14 @@ $data = http_build_query([
     'fingerprint' => 'test'
 ]);
 
-$context = stream_context_create([
+$acoustid_context = stream_context_create([
     'http' => [
         'method' => 'POST',
         'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
-        'content' => $data,
-        'timeout' => 30
+        'content' => $post_data,
+        'timeout' => 120,
+        'user_agent' => 'SIJA Music Scanner v1.3',
+        'ignore_errors' => true
     ]
 ]);
 
