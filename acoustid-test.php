@@ -4,7 +4,7 @@ header('Content-Type: text/plain');
 $url = 'https://api.acoustid.org/v2/lookup';
 
 $post_data = http_build_query([
-    'client' => 'DIN_API_KEY_HER',
+    'client' => 'W1ojLlGldj',
     'duration' => 10,
     'fingerprint' => 'test'
 ]);
